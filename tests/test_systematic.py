@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 import autograd.numpy.random as npr
 import autograd.numpy as np
+import autograd.numpy.linalg as linalg
 import autograd.scipy.stats.multivariate_normal as mvn
 import operator as op
 from numpy_utils import (combo_check, stat_check, unary_ufunc_check,
@@ -180,3 +181,6 @@ def test_concatenate_3d():    combo_check(np.concatenate, [0], [(R(2, 2, 2), R(2
 def make_psd(mat): return np.dot(mat.T, mat) + np.eye(mat.shape[0])
 def test_mvn_pdf():    combo_check(mvn.logpdf, [0, 1, 2], [R(4)], [R(4)], [make_psd(R(4, 4))])
 def test_mvn_logpdf(): combo_check(mvn.logpdf, [0, 1, 2], [R(4)], [R(4)], [make_psd(R(4, 4))])
+
+def test_cholesky(): combo_check(linalg.cholesky, [0], [make_psd(R(4, 4))])
+#test_cholesky()
