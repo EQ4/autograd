@@ -27,9 +27,7 @@ def normalize(a):
 
 
 def inner(a, b):
-    def contract(x, y):
-        return np.sum(x * y)
-    return sum(map(contract, a, b))
+    return np.sum(a * b)
 
 
 ### Gaussian exp fam
@@ -39,21 +37,21 @@ def gaussian():
         mu, Sigma = theta
         J = np.linalg.inv(Sigma)
         h = np.dot(J, mu)
-        return (-1./2 * J, h)
+        return np.vstack((-1./2*J, h))
 
     def statistic(y):
-        return (np.outer(y,y), y)
-
-    def logZ(eta):
-        J, h = -2*eta[0], eta[1]
-        return -1./2 * np.dot(h, np.linalg.solve(J, h)) \
-            + 1./2 * np.log(np.linalg.det(J))
+        return np.vstack((np.outer(y,y), y))
 
     def max_likelihood(expected_stats, n):
-        yyT, y = expected_stats
+        yyT, y = expected_stats[:-1], expected_stats[-1]
         mu = y / n
         Sigma = yyT / n - np.outer(mu, mu)
         return mu, Sigma
+
+    def logZ(eta):
+        J, h = -2*eta[:-1], eta[-1]
+        return -1./2 * np.dot(h, np.linalg.solve(J, h)) \
+            + 1./2 * np.log(np.linalg.det(J))
 
     return eta, statistic, logZ, max_likelihood
 
@@ -69,9 +67,7 @@ def EM(init_params, data, expfam_fns):
     def E_step(params, data):
         pi, A, thetas = params
         natural_params = np.log(pi), np.log(A), map(eta, thetas), \
-            map(lambda theta: logZ(eta(theta)), thetas)
-        # TODO grad returns something of length 2*N*T
-        # one of these plus's must be mapping to tuple plus?
+            map(lambda theta: -logZ(eta(theta)), thetas)
         import ipdb; ipdb.set_trace()
         return grad(hmm_log_partition_function)(natural_params, data)
 
@@ -82,28 +78,28 @@ def EM(init_params, data, expfam_fns):
         return pi, A, thetas
 
     def hmm_log_partition_function(natural_params, data):
-        log_pi, log_A, etas, logZs = natural_params
+        log_pi, log_A, etas, neglogZs = natural_params
         log_alpha = log_pi
         for y in data:
             log_alpha = logsumexp(log_alpha[:,None] + log_A, axis=0) \
-                + log_likelihoods(y, etas, logZs)
+                + log_likelihoods(y, etas, neglogZs)
         return logsumexp(log_alpha)
 
-    def log_likelihoods(y, etas, logZs):
-        def log_likelihood(eta, logZ):
-            return inner(eta, statistic(y)) - logZ
-        return np.array(map(log_likelihood, etas, logZs))
+    def log_likelihoods(y, etas, neglogZs):
+        def log_likelihood(eta, neglogZ):
+            return inner(eta, statistic(y)) + neglogZ
+        return np.array(map(log_likelihood, etas, neglogZs))
 
     return fixed_point(EM_update, init_params)
 
 
 if __name__ == '__main__':
     np.random.seed(0)
-    np.seterr(divide='ignore')
+    np.seterr(divide='ignore', invalid='raise')
 
     data = npr.randn(10,2)  # TODO
 
-    N = 3
+    N = 2
     D = data.shape[1]
 
     def rand_gaussian(D):
