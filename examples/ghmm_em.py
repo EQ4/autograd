@@ -42,16 +42,16 @@ def gaussian():
     def statistic(y):
         return np.vstack((np.outer(y,y), y))
 
+    def logZ(eta):
+        J, h = -2*eta[:-1], eta[-1]
+        return -1./2 * np.dot(h, np.linalg.solve(J, h)) \
+            + 1./2 * np.log(np.linalg.det(J))
+
     def max_likelihood(expected_stats, n):
         yyT, y = expected_stats[:-1], expected_stats[-1]
         mu = y / n
         Sigma = yyT / n - np.outer(mu, mu)
         return mu, Sigma
-
-    def logZ(eta):
-        J, h = -2*eta[:-1], eta[-1]
-        return -1./2 * np.dot(h, np.linalg.solve(J, h)) \
-            + 1./2 * np.log(np.linalg.det(J))
 
     return eta, statistic, logZ, max_likelihood
 
