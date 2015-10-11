@@ -51,8 +51,8 @@ def gaussian():
         return -1./2 * np.dot(h, np.linalg.solve(J, h)) \
             + 1./2 * np.log(np.linalg.det(J))
 
-    def max_likelihood(expected_stats, n):
-        yyT, y = expected_stats
+    def max_likelihood(expected_stats):
+        yyT, y, n = expected_stats
         mu = y / n
         Sigma = yyT / n - np.outer(mu, mu)
         return mu, Sigma
@@ -70,28 +70,28 @@ def EM(init_params, data, expfam_fns):
 
     def E_step(params, data):
         pi, A, thetas = params
-        natural_params = np.log(pi), np.log(A), map(eta, thetas), \
-            map(lambda theta: -logZ(eta(theta)), thetas)
+        natural_params = np.log(pi), np.log(A), \
+            map(lambda theta: eta(theta) + (-logZ(eta(theta)),), thetas)
         return grad(hmm_log_partition_function)(natural_params, data)
 
     def M_step(expected_stats):
-        E_init, E_trans, E_obs_statistics, E_ns = expected_stats
+        E_init, E_trans, E_obs_statistics = expected_stats
         pi, A = normalize(E_init), normalize(E_trans)
-        thetas = map(max_likelihood, E_obs_statistics, E_ns)
+        thetas = map(max_likelihood, E_obs_statistics)
         return pi, A, thetas
 
     def hmm_log_partition_function(natural_params, data):
-        log_pi, log_A, etas, neglogZs = natural_params
+        log_pi, log_A, etas = natural_params
         log_alpha = log_pi
         for y in data:
             log_alpha = logsumexp(log_alpha[:,None] + log_A, axis=0) \
-                + log_likelihoods(y, etas, neglogZs)
+                + log_likelihoods(y, etas)
         return logsumexp(log_alpha)
 
-    def log_likelihoods(y, etas, neglogZs):
-        def log_likelihood(eta, neglogZ):
-            return inner(eta, statistic(y)) + neglogZ
-        return np.array(map(log_likelihood, etas, neglogZs))
+    def log_likelihoods(y, etas):
+        stat = statistic(y) + (1,)
+        log_likelihood = lambda eta: inner(eta, stat)
+        return np.array(map(log_likelihood, etas))
 
     return fixed_point(EM_update, init_params)
 
@@ -100,7 +100,7 @@ if __name__ == '__main__':
     np.random.seed(0)
     np.seterr(divide='ignore', invalid='raise')
 
-    data = npr.randn(10,2)  # TODO
+    data = npr.randn(10,2)  # TODO load something interesting
 
     N = 2
     D = data.shape[1]
