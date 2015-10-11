@@ -11,13 +11,15 @@ from autograd import grad
 
 def fixed_point(f, x0):
     x1 = f(x0)
-    while different(x0, x1):
+    while not same(x0, x1):
         x0, x1 = x1, f(x1)
     return x1
 
 
-def different(tup1, tup2):
-    return not all(map(np.allclose, tup1, tup2))
+def same(a, b):
+    if isinstance(a, np.ndarray):
+        return np.allclose(a, b)
+    return all(map(same, a, b))
 
 
 def normalize(a):
@@ -27,7 +29,9 @@ def normalize(a):
 
 
 def inner(a, b):
-    return np.sum(a * b)
+    def contract(x, y):
+        return np.sum(x * y)
+    return sum(map(contract, a, b))
 
 
 ### Gaussian exp fam
@@ -37,18 +41,18 @@ def gaussian():
         mu, Sigma = theta
         J = np.linalg.inv(Sigma)
         h = np.dot(J, mu)
-        return np.vstack((-1./2*J, h))
+        return -1./2*J, h
 
     def statistic(y):
-        return np.vstack((np.outer(y,y), y))
+        return np.outer(y,y), y
 
     def logZ(eta):
-        J, h = -2*eta[:-1], eta[-1]
+        J, h = -2*eta[0], eta[1]
         return -1./2 * np.dot(h, np.linalg.solve(J, h)) \
             + 1./2 * np.log(np.linalg.det(J))
 
     def max_likelihood(expected_stats, n):
-        yyT, y = expected_stats[:-1], expected_stats[-1]
+        yyT, y = expected_stats
         mu = y / n
         Sigma = yyT / n - np.outer(mu, mu)
         return mu, Sigma
@@ -68,7 +72,6 @@ def EM(init_params, data, expfam_fns):
         pi, A, thetas = params
         natural_params = np.log(pi), np.log(A), map(eta, thetas), \
             map(lambda theta: -logZ(eta(theta)), thetas)
-        import ipdb; ipdb.set_trace()
         return grad(hmm_log_partition_function)(natural_params, data)
 
     def M_step(expected_stats):
